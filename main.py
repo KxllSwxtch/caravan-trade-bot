@@ -188,7 +188,7 @@ def show_favorite_cars(message):
             f"🔢 Пробег: {car_mileage} | 🏎 Объём: {format_number(car_engine_volume)} cc\n\n"
             f"Стоимость авто под ключ:\n"
             f"₩{format_number(total_cost_krw)} | {format_number(total_cost_rub)} ₽\n\n"
-            # f"📌 *Статус:* {car_status}\n\n"
+            f"📌 *Статус:* {car_status}\n\n"
             f"[🔗 Ссылка на автомобиль]({car_link})\n\n"
             f"Консультация с менеджерами:\n\n"
             f"▪️ +82-10-7255-9578 (Сергей)\n"
@@ -196,13 +196,13 @@ def show_favorite_cars(message):
 
         # Создаём клавиатуру
         keyboard = types.InlineKeyboardMarkup()
-        # if car_status == "🔄 Не заказано":
-        #     keyboard.add(
-        #         types.InlineKeyboardButton(
-        #             f"📦 Заказать {car_title}",
-        #             callback_data=f"order_car_{car_id}",
-        #         )
-        #     )
+        if car_status == "🔄 Не заказано":
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    f"📦 Заказать {car_title}",
+                    callback_data=f"order_car_{car_id}",
+                )
+            )
         keyboard.add(
             types.InlineKeyboardButton(
                 "❌ Удалить авто из списка", callback_data=f"delete_car_{car_id}"
@@ -2524,7 +2524,7 @@ def handle_message(message):
 
 # Run the bot
 if __name__ == "__main__":
-    create_tables()
+    # create_tables()
     set_bot_commands()
 
     # Обновляем курс каждые 12 часов
