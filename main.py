@@ -36,8 +36,8 @@ from utils import (
     get_customs_fees_manual,
 )
 
-CALCULATE_CAR_TEXT = "Рассчитать Автомобиль (Encar, KBChaCha, KCar)"
-CHANNEL_USERNAME = "autofromkorea82"
+CALCULATE_CAR_TEXT = "Рассчитать Автомобиль (Encar.com, KBChaChaCha.com, KCar.com)"
+CHANNEL_USERNAME = "crvntrade"
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 load_dotenv()
@@ -2523,7 +2523,7 @@ def handle_message(message):
 
 # Run the bot
 if __name__ == "__main__":
-    # create_tables()
+    create_tables()
     set_bot_commands()
 
     # Обновляем курс каждые 12 часов
