@@ -181,12 +181,13 @@ def show_favorite_cars(message):
         total_cost_rub = car["total_cost_rub"]
 
         # Формируем текст сообщения
+        # ${format_number(total_cost_usd)} |
         response_text = (
             f"🚗 *{car_title} ({car_id})*\n\n"
             f"📅 {car_month}/{car_year} | ⚙️ {car_transmission}\n"
             f"🔢 Пробег: {car_mileage} | 🏎 Объём: {format_number(car_engine_volume)} cc\n\n"
             f"Стоимость авто под ключ:\n"
-            f"${format_number(total_cost_usd)} | ₩{format_number(total_cost_krw)} | {format_number(total_cost_rub)} ₽\n\n"
+            f"₩{format_number(total_cost_krw)} | {format_number(total_cost_rub)} ₽\n\n"
             # f"📌 *Статус:* {car_status}\n\n"
             f"[🔗 Ссылка на автомобиль]({car_link})\n\n"
             f"Консультация с менеджерами:\n\n"
