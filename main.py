@@ -198,7 +198,8 @@ def show_favorite_cars(message):
             f"📌 *Статус:* {car_status}\n\n"
             f"[🔗 Ссылка на автомобиль]({car_link})\n\n"
             f"Консультация с менеджерами:\n\n"
-            f"▪️ +82-10-2889-2307  (Олег)\n"
+            f"▪️ +82-10-2889-2307 (Олег)\n"
+            f"▪️ +82-10-5812-2515 (Дмитрий)\n"
         )
 
         # Создаём клавиатуру
@@ -1411,7 +1412,7 @@ def calculate_cost(link, message):
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(
             types.InlineKeyboardButton(
-                "Написать менеджеру", url="https://t.me/Aleksandr_82auto"
+                "Написать менеджеру", url="https://t.me/KaMik_23"
             )
         )
         keyboard.add(
@@ -1551,6 +1552,7 @@ def calculate_cost(link, message):
             f"🔗 <a href='{preview_link}'>Ссылка на автомобиль</a>\n\n"
             "Если данное авто попадает под санкции, пожалуйста уточните возможность отправки в вашу страну у наших менеджеров:\n\n"
             f"▪️ +82-10-2889-2307 (Олег)\n\n"
+            f"▪️ +82-10-5812-2515 (Дмитрий)\n\n"
             "🔗 <a href='https://t.me/crvntrade'>Официальный телеграм канал</a>\n"
         )
 
@@ -1582,7 +1584,7 @@ def calculate_cost(link, message):
             )
         keyboard.add(
             types.InlineKeyboardButton(
-                "Написать менеджеру", url="https://t.me/Aleksandr_82auto"
+                "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
             )
         )
         keyboard.add(
@@ -1915,6 +1917,7 @@ def handle_callback_query(call):
             f"🟰 Итого под ключ: \n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['total_cost_krw'])}</b> | <b>{format_number(car_data['total_cost_rub'])} ₽</b>\n\n"
             f"🚚 <b>Доставку до вашего города уточняйте у менеджеров:</b>\n"
             f"▪️ +82-10-2889-2307 (Олег)\n"
+            f"▪️ +82-10-5812-2515 (Дмитрий)\n"
             # f"▪️ +82 10-5128-8082 (Александр)\n\n"
         )
 
@@ -2007,7 +2010,7 @@ def handle_callback_query(call):
             )
             keyboard.add(
                 types.InlineKeyboardButton(
-                    "Связаться с менеджером", url="https://t.me/Aleksandr_82auto"
+                    "Связаться с менеджером", url="https://t.me/KaMik_23"
                 )
             )
 
@@ -2043,7 +2046,7 @@ def handle_callback_query(call):
             )
             keyboard.add(
                 types.InlineKeyboardButton(
-                    "Связаться с менеджером", url="https://t.me/Aleksandr_82auto"
+                    "Связаться с менеджером", url="https://t.me/KaMik_23"
                 )
             )
             keyboard.add(
@@ -2259,6 +2262,7 @@ def process_car_price(message):
         f"🟰 Итого под ключ: \n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['total_cost_krw'])}</b> | <b>{format_number(car_data['total_cost_rub'])} ₽</b>\n\n"
         f"🚚 <b>Доставку до вашего города уточняйте у менеджеров:</b>\n"
         f"▪️ +82-10-2889-2307 (Олег)\n"
+        f"▪️ +82-10-5812-2515 (Дмитрий)\n"
         # f"▪️ +82 10-5128-8082 (Александр)\n\n"
     )
 
@@ -2271,7 +2275,7 @@ def process_car_price(message):
     # )
     keyboard.add(
         types.InlineKeyboardButton(
-            "Связаться с менеджером", url="https://t.me/Aleksandr_82auto"
+            "Связаться с менеджером", url="https://t.me/KaMik_23"
         )
     )
     keyboard.add(types.InlineKeyboardButton("Главное меню", callback_data="main_menu"))
@@ -2336,6 +2340,7 @@ def handle_message(message):
     elif user_message == "Написать менеджеру":
         managers_list = [
             {"name": "Олег ", "whatsapp": "https://wa.me/821028892307"},
+            {"name": "Дмитрий ", "whatsapp": "https://wa.me/821058122515"},
             # {"name": "Александр", "whatsapp": "https://wa.me/821068766801"},
         ]
 
