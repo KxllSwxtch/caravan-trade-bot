@@ -1412,7 +1412,12 @@ def calculate_cost(link, message):
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(
             types.InlineKeyboardButton(
-                "Написать менеджеру", url="https://t.me/KaMik_23"
+                "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+            )
+        )
+        keyboard.add(
+            types.InlineKeyboardButton(
+                "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
             )
         )
         keyboard.add(
@@ -1585,6 +1590,11 @@ def calculate_cost(link, message):
         keyboard.add(
             types.InlineKeyboardButton(
                 "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+            )
+        )
+        keyboard.add(
+            types.InlineKeyboardButton(
+                "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
             )
         )
         keyboard.add(
@@ -2013,6 +2023,11 @@ def handle_callback_query(call):
                     "Связаться с менеджером", url="https://t.me/KaMik_23"
                 )
             )
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    "Связаться с менеджером", url="https://t.me/KaMik_23"
+                )
+            )
 
             # Отправка сообщения об ошибке
             bot.send_message(
@@ -2042,6 +2057,11 @@ def handle_callback_query(call):
                 types.InlineKeyboardButton(
                     "Рассчитать стоимость другого автомобиля",
                     callback_data="calculate_another",
+                )
+            )
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    "Связаться с менеджером", url="https://t.me/KaMik_23"
                 )
             )
             keyboard.add(
@@ -2273,6 +2293,11 @@ def process_car_price(message):
     #         "Рассчитать другой автомобиль", callback_data="calculate_another_manual"
     #     )
     # )
+    keyboard.add(
+        types.InlineKeyboardButton(
+            "Связаться с менеджером", url="https://t.me/KaMik_23"
+        )
+    )
     keyboard.add(
         types.InlineKeyboardButton(
             "Связаться с менеджером", url="https://t.me/KaMik_23"
