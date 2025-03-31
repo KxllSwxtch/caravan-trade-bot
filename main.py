@@ -1090,6 +1090,7 @@ def get_car_info(url):
 
         car_engine_displacement = str(response["spec"]["displacement"])
         car_type = response["spec"]["bodyName"]
+        fuel_type = response["spec"]["fuelName"]
 
         # Список фотографий (берем первые 10)
         car_photos = [
@@ -1119,6 +1120,7 @@ def get_car_info(url):
             car_photos,
             year,
             month,
+            fuel_type,
         ]
     elif "kbchachacha.com" in url:
         url = f"https://www.kbchachacha.com/public/car/detail.kbc?carSeq={car_id_external}"
@@ -1338,6 +1340,7 @@ def calculate_cost(link, message):
             car_photos,
             year,
             month,
+            fuel_type,
         ) = result
 
         preview_link = f"https://fem.encar.com/cars/detail/{car_id}"
@@ -1368,6 +1371,8 @@ def calculate_cost(link, message):
         )
         car_photos = result["images"]
 
+        fuel_type = "가솔린"
+
         preview_link = (
             f"https://www.kbchachacha.com/public/car/detail.kbc?carSeq={car_id}"
         )
@@ -1387,6 +1392,8 @@ def calculate_cost(link, message):
         car_price = int(result["car_price"]) / 10000
 
         car_photos = result["images"]
+
+        fuel_type = "가솔린"
 
         # Форматируем дату
         formatted_car_date = (
@@ -1466,7 +1473,9 @@ def calculate_cost(link, message):
             price_krw,
             int(formatted_car_year),
             car_month,
-            engine_type=1,
+            engine_type=(
+                1 if fuel_type == "가솔린" else 2 if fuel_type == "디젤" else 3
+            ),
         )
 
         # Таможенный сбор
@@ -1550,22 +1559,30 @@ def calculate_cost(link, message):
             f"▪️ Пробег: <b>{formatted_mileage}</b>\n"
             f"▪️ Объём двигателя: <b>{engine_volume_formatted}</b>\n"
             f"▪️ КПП: <b>{formatted_transmission}</b>\n\n"
-            f"▪️ Стоимость автомобиля в Корее:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(price_krw)}</b>\n\n"
-            f"▪️ Стоимость автомобиля под ключ до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(total_cost_krw)}</b> | <b>{format_number(total_cost)} ₽</b>\n\n"
-            f"{car_insurance_payments_chutcha}"
             f"💰 <b>Курс Рубля к Воне: ₩{rub_to_krw_rate:.2f}</b>\n\n"
+            # f"▪️ Стоимость автомобиля в Корее:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(price_krw)}</b>\n\n"
+            # f"▪️ Стоимость автомобиля под ключ до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(total_cost_krw)}</b> | <b>{format_number(total_cost)} ₽</b>\n\n"
+            f"1️⃣ Стоимость автомобиля:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['car_price_krw'])}</b> | <b>{format_number(car_data['car_price_rub'])} ₽</b>\n\n"
+            f"2️⃣ Комиссия Encar:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['encar_fee_krw'])}</b> | <b>{format_number(car_data['encar_fee_rub'])} ₽</b>\n\n"
+            f"3️⃣ Доставка до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['delivery_fee_krw'])}</b> | <b>{format_number(car_data['delivery_fee_rub'])} ₽</b>\n\n"
+            f"4️⃣ Единая таможенная ставка:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_duty_krw'])}</b> | <b>{format_number(car_data['customs_duty_rub'])} ₽</b>\n\n"
+            f"5️⃣ Таможенное оформление:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_fee_krw'])}</b> | <b>{format_number(car_data['customs_fee_rub'])} ₽</b>\n\n"
+            f"6️⃣ Утилизационный сбор:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['util_fee_krw'])}</b> | <b>{format_number(car_data['util_fee_rub'])} ₽</b>\n\n"
+            f"7️⃣ Услуги брокера:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['broker_fee_krw'])}</b> | <b>{format_number(car_data['broker_fee_rub'])} ₽</b>\n\n"
+            f"🟰 Итого под ключ: \n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['total_cost_krw'])}</b> | <b>{format_number(car_data['total_cost_rub'])} ₽</b>\n\n"
+            f"{car_insurance_payments_chutcha}"
             f"🔗 <a href='{preview_link}'>Ссылка на автомобиль</a>\n\n"
             "Если данное авто попадает под санкции, пожалуйста уточните возможность отправки в вашу страну у наших менеджеров:\n\n"
-            f"▪️ +82-10-2889-2307 (Олег)\n\n"
+            f"▪️ +82-10-2889-2307 (Олег)\n"
             f"▪️ +82-10-5812-2515 (Дмитрий)\n\n"
             "🔗 <a href='https://t.me/crvntrade'>Официальный телеграм канал</a>\n"
         )
 
         # Клавиатура с дальнейшими действиями
         keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(
-            types.InlineKeyboardButton("Детали расчёта", callback_data="detail")
-        )
+        # keyboard.add(
+        #     types.InlineKeyboardButton("Детали расчёта", callback_data="detail")
+        # )
 
         # Кнопка для добавления в избранное
         keyboard.add(
