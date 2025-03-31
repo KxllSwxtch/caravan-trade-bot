@@ -1450,6 +1450,7 @@ def calculate_cost(link, message):
         # 2. Комиссия Encar (440,000 вон)
         # 3. Доставка до Владивостока (воны)
         # 4. Таможенные платежи во Владивостоке
+        # 5. Услуги брокера
 
         price_krw = int(car_price) * 10000
         price_rub = price_krw / rub_to_krw_rate
@@ -1475,6 +1476,7 @@ def calculate_cost(link, message):
             + customs_fee  # Таможенный сбор
             + customs_duty  # Таможенная пошлина
             + recycling_fee  # Утильсбор
+            + 100000  # Услуги брокера
         )
 
         total_cost_krw = (
@@ -1484,6 +1486,7 @@ def calculate_cost(link, message):
             + (customs_fee * rub_to_krw_rate)  # Таможенный сбор
             + (customs_duty * rub_to_krw_rate)  # Таможенная пошлина
             + (recycling_fee * rub_to_krw_rate)  # Утильсбор
+            + (100000 * rub_to_krw_rate)  # Услуги брокера
         )
 
         # Общая сумма под ключ до Владивостока
@@ -1511,6 +1514,9 @@ def calculate_cost(link, message):
 
         car_data["util_fee_rub"] = recycling_fee
         car_data["util_fee_krw"] = recycling_fee * rub_to_krw_rate
+
+        car_data["broker_fee_rub"] = 100000
+        car_data["broker_fee_krw"] = 100000 * rub_to_krw_rate
 
         car_insurance_payments_chutcha = ""
         if "kcar" in link:
@@ -1905,7 +1911,8 @@ def handle_callback_query(call):
             f"4️⃣ Единая таможенная ставка:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_duty_krw'])}</b> | <b>{format_number(car_data['customs_duty_rub'])} ₽</b>\n\n"
             f"5️⃣ Таможенное оформление:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_fee_krw'])}</b> | <b>{format_number(car_data['customs_fee_rub'])} ₽</b>\n\n"
             f"6️⃣ Утилизационный сбор:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['util_fee_krw'])}</b> | <b>{format_number(car_data['util_fee_rub'])} ₽</b>\n\n"
-            f"🟰 Итого под ключ: \n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['total_cost_krw'])}</b> | <b>{format_number(car_data['total_cost_rub'])} ₽</b>\n\n"
+            f"7️⃣ Услуги брокера:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['util_fee_krw'])}</b> | <b>{format_number(car_data['util_fee_rub'])} ₽</b>\n\n"
+            f"🟰 Итого под ключ:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['broker_fee_krw'])}</b> | <b>{format_number(car_data['broker_fee_rub'])} ₽</b>\n\n"
             f"🚚 <b>Доставку до вашего города уточняйте у менеджеров:</b>\n"
             f"▪️ +82-10-2889-2307 (Олег)\n"
             # f"▪️ +82 10-5128-8082 (Александр)\n\n"
