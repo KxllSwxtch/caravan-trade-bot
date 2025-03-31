@@ -62,6 +62,18 @@ def create_tables():
                 """
             )
 
+            # ✅ Таблица пользователей
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id BIGINT PRIMARY KEY,
+                    first_name TEXT,
+                    username TEXT,
+                    timestamp TIMESTAMP
+                );
+                """
+            )
+
             conn.commit()
 
 
@@ -273,5 +285,36 @@ def delete_favorite_car(user_id, car_id):
             cur.execute(
                 "DELETE FROM orders WHERE user_id = %s AND car_id = %s;",
                 (user_id, car_id),
+            )
+            conn.commit()
+
+
+def get_all_users():
+    """Возвращает список всех пользователей из таблицы users."""
+    with connect_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM users;")
+            users = cur.fetchall()
+    return users
+
+
+def add_user(user_info):
+    """Добавляет пользователя в таблицу users. Если пользователь с таким id уже существует, ничего не делает.
+    Ожидается, что user_info — словарь с ключами id, first_name, username и timestamp.
+    """
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users (id, first_name, username, timestamp)
+                VALUES (%s, %s, %s, to_timestamp(%s))
+                ON CONFLICT (id) DO NOTHING;
+                """,
+                (
+                    user_info["id"],
+                    user_info.get("first_name"),
+                    user_info.get("username"),
+                    user_info.get("timestamp"),
+                ),
             )
             conn.commit()
