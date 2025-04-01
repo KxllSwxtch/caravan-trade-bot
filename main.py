@@ -6,6 +6,7 @@ import requests
 import locale
 import logging
 import urllib.parse
+import random
 
 from concurrent.futures import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -72,6 +73,14 @@ usd_to_krw_rate = 0
 usd_to_rub_rate = 0
 
 usdt_to_krw_rate = 0
+
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gecko/20100101 Firefox/113.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.128 Safari/537.36",
+]
 
 
 ################## КОД ДЛЯ СТАТУСОВ
@@ -886,17 +895,28 @@ def get_usdt_to_krw_rate():
 def get_rub_to_krw_rate():
     global rub_to_krw_rate
 
-    url = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/rub.json"
+    url = "https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_RUBKRW"
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-        }
+        headers = {"User-Agent": random.choice(user_agents)}
         response = requests.get(url, headers=headers)
-
         response.raise_for_status()
-        price_value = response.json()["rub"]["krw"]
 
-        rub_to_krw_rate = float(price_value) - 0.8
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Ищем вложенный элемент, содержащий курс
+        rate_em = soup.select_one("p.no_today em.no_up em.no_up")
+        if not rate_em:
+            print(
+                "Ошибка: не найден вложенный элемент с курсом (em.no_up внутри em.no_up)"
+            )
+            return None
+
+        rate_text = rate_em.get_text().strip()
+        # Преобразуем текст в число, убирая возможные запятые
+        rate_value = float(rate_text.replace(",", "").strip())
+
+        # Вычитаем 0.8 пунктов
+        rub_to_krw_rate = rate_value - 0.8
     except requests.RequestException as e:
         print(f"Ошибка при получении курса RUB → KRW: {e}")
         return None
