@@ -1333,7 +1333,7 @@ def calculate_cost(link, message):
             send_error_message(message, "🚫 Не удалось извлечь carSeq из ссылки.")
             return
 
-    elif "kcar.com" in link:
+    elif "kcar.com" in link or "m.kcar.com" in link:
         parsed_url = urlparse(link)
         query_params = parse_qs(parsed_url.query)
 
@@ -2400,7 +2400,7 @@ def handle_message(message):
         show_faq(message)
 
     elif re.match(
-        r"^https?://(www|fem)\.encar\.com/.*|^https?://(www\.)?kbchachacha\.com/.*|^https?://m\.kbchachacha\.com/.*|^https?://(www\.)?kcar\.com/.*",
+        r"^https?://(www|fem)\.encar\.com/.*|^https?://(www\.)?kbchachacha\.com/.*|^https?://m\.kbchachacha\.com/.*|^https?://(www|m)\.kcar\.com/.*",
         user_message,
     ):
         calculate_cost(user_message, message)
