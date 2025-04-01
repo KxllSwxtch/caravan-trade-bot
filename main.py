@@ -1389,6 +1389,10 @@ def calculate_cost(link, message):
         year = car_year
 
         car_engine_displacement = re.sub(r"[^\d]", "", result["engine_volume"])
+        car_engine_displacement = (
+            2200 if result["fuel"] == "디젤" else car_engine_displacement
+        )
+
         car_price = int(result["car_price"]) / 10000
         formatted_car_date = f"01{car_month}{match.group(1)}"
         formatted_mileage = result["mileage"]
