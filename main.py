@@ -903,20 +903,26 @@ def get_rub_to_krw_rate():
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Ищем вложенный элемент, содержащий курс
-        rate_em = soup.select_one("p.no_today em.no_up em.no_up")
+        # Ищем элемент p.no_today
+        today_p = soup.select_one("p.no_today")
+        if not today_p:
+            print("Ошибка: не найден элемент p.no_today")
+            return None
+
+        # Ищем вложенный элемент с курсом: em.no_down внутри em.no_down
+        rate_em = today_p.select_one("em.no_down em.no_down")
         if not rate_em:
-            print(
-                "Ошибка: не найден вложенный элемент с курсом (em.no_up внутри em.no_up)"
-            )
+            print("Ошибка: не найден элемент с курсом (em.no_down внутри em.no_down)")
             return None
 
         rate_text = rate_em.get_text().strip()
         # Преобразуем текст в число, убирая возможные запятые
         rate_value = float(rate_text.replace(",", "").strip())
+        # Вычитаем 0.8 и округляем до 2 знаков после запятой
+        rub_to_krw_rate = round(rate_value - 0.8, 2)
 
-        # Вычитаем 0.8 пунктов
-        rub_to_krw_rate = rate_value - 0.8
+        # Возвращаем число в виде строки с 2 десятичными знаками
+        return f"{rub_to_krw_rate:.2f}"
     except requests.RequestException as e:
         print(f"Ошибка при получении курса RUB → KRW: {e}")
         return None
@@ -2462,7 +2468,7 @@ if __name__ == "__main__":
     # Обновляем курс каждые 12 часов
     scheduler = BackgroundScheduler()
     scheduler.add_job(get_usdt_to_krw_rate, "interval", hours=12)
-    scheduler.add_job(get_rub_to_krw_rate, "interval", minutes=5)
+    scheduler.add_job(get_currency_rates, "interval", minutes=5)
     scheduler.start()
 
     bot.polling(non_stop=True)
