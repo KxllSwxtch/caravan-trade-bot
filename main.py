@@ -2462,6 +2462,7 @@ if __name__ == "__main__":
     # Обновляем курс каждые 12 часов
     scheduler = BackgroundScheduler()
     scheduler.add_job(get_usdt_to_krw_rate, "interval", hours=12)
+    scheduler.add_job(get_rub_to_krw_rate, "interval", minutes=5)
     scheduler.start()
 
     bot.polling(non_stop=True)
