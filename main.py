@@ -2177,7 +2177,7 @@ def handle_callback_query(call):
     elif call.data == "calculate_another":
         bot.send_message(
             call.message.chat.id,
-            "Пожалуйста, введите ссылку на автомобиль с сайта (encar.com, kbchachacha.com, web.chutcha.net)",
+            "Пожалуйста, введите ссылку на автомобиль с сайта (encar.com, kbchachacha.com, kcar.com)",
         )
 
     elif call.data == "calculate_another_manual":
@@ -2507,7 +2507,7 @@ def handle_message(message):
     else:
         bot.send_message(
             message.chat.id,
-            "Пожалуйста, введите ссылку на автомобиль с сайта (encar.com, kbchachacha.com, web.chutcha.net)",
+            "Пожалуйста, введите ссылку на автомобиль с сайта (encar.com, kbchachacha.com, kcar.com)",
         )
 
 
