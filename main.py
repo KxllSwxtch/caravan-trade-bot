@@ -901,31 +901,45 @@ def get_rub_to_krw_rate():
         response = requests.get(url, headers=headers)
         response.raise_for_status()
 
+        print(response.text)
+
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Ищем элемент p.no_today
         today_p = soup.select_one("p.no_today")
-        if not today_p:
-            print("Ошибка: не найден элемент p.no_today")
-            return None
 
-        # Ищем вложенный элемент с курсом: em.no_down внутри em.no_down
-        rate_em = today_p.select_one("em.no_down em.no_down")
+        if not today_p:
+            raise ValueError("Element p.no_today not found")
+
+        # Ищем вложенный элемент с курсом: em.no_up или em.no_down внутри em.no_up или em.no_down
+        rate_em = None
+        for class_name in ["no_up", "no_down"]:
+            outer_em = today_p.select_one(f"em.{class_name}")
+            if outer_em:
+                rate_em = outer_em.select_one(f"em.{class_name}")
+                if rate_em:
+                    break
+
         if not rate_em:
-            print("Ошибка: не найден элемент с курсом (em.no_down внутри em.no_down)")
-            return None
+            raise ValueError("Rate element not found")
 
         rate_text = rate_em.get_text().strip()
         # Преобразуем текст в число, убирая возможные запятые
         rate_value = float(rate_text.replace(",", "").strip())
+        if rate_value <= 0:
+            raise ValueError("Invalid rate value <= 0")
+
         # Вычитаем 0.8 и округляем до 2 знаков после запятой
         rub_to_krw_rate = round(rate_value - 0.8, 2)
 
-        # Возвращаем число в виде строки с 2 десятичными знаками
-        return f"{rub_to_krw_rate:.2f}"
-    except requests.RequestException as e:
-        print(f"Ошибка при получении курса RUB → KRW: {e}")
-        return None
+        return rub_to_krw_rate
+
+    except (requests.RequestException, ValueError) as e:
+        print(f"Error getting RUB → KRW rate: {e}")
+        # Return last known good rate if we have one, otherwise use a fallback rate
+        if rub_to_krw_rate and rub_to_krw_rate > 0:
+            return rub_to_krw_rate
+        return 15.50  # Fallback rate if everything fails
 
 
 def get_currency_rates():
@@ -1294,422 +1308,457 @@ def get_car_info(url):
 def calculate_cost(link, message):
     global car_data, car_id_external, car_month, car_year, krw_rub_rate, eur_rub_rate, rub_to_krw_rate, usd_rate, usdt_to_krw_rate
 
-    get_currency_rates()
-    get_usdt_to_krw_rate()
+    try:
+        # Get current rates
+        rate = get_currency_rates()
+        krw_rate = get_rub_to_krw_rate()
+        usdt_rate = get_usdt_to_krw_rate()
 
-    bot.send_message(
-        message.chat.id,
-        "✅ Подгружаю актуальный курс валют и делаю расчёты. ⏳ Пожалуйста подождите...",
-        parse_mode="Markdown",
-    )
-
-    print_message("ЗАПРОС НА РАСЧЁТ АВТОМОБИЛЯ")
-
-    # Отправляем сообщение и сохраняем его ID
-    processing_message = bot.send_message(message.chat.id, "Обрабатываю данные... ⏳")
-
-    car_id = None
-    car_title = ""
-
-    if "fem.encar.com" in link:
-        car_id_match = re.findall(r"\d+", link)
-        if car_id_match:
-            car_id = car_id_match[0]  # Use the first match of digits
-            car_id_external = car_id
-            link = f"https://fem.encar.com/cars/detail/{car_id}"
-        else:
-            send_error_message(message, "🚫 Не удалось извлечь carid из ссылки.")
-            return
-
-    elif "kbchachacha.com" in link or "m.kbchachacha.com" in link:
-        parsed_url = urlparse(link)
-        query_params = parse_qs(parsed_url.query)
-        car_id = query_params.get("carSeq", [None])[0]
-
-        if car_id:
-            car_id_external = car_id
-            link = f"https://www.kbchachacha.com/public/car/detail.kbc?carSeq={car_id}"
-        else:
-            send_error_message(message, "🚫 Не удалось извлечь carSeq из ссылки.")
-            return
-
-    elif "kcar.com" in link or "m.kcar.com" in link:
-        parsed_url = urlparse(link)
-        query_params = parse_qs(parsed_url.query)
-
-        if "i_sCarCd" in query_params:
-            car_id = query_params["i_sCarCd"][0]
-            car_id_external = car_id
-            link = f"https://api.kcar.com/bc/car-info-detail-of-ng?i_sCarCd={car_id}&i_sPassYn=N&bltbdKnd=CM050"
-        else:
-            send_error_message(
-                message, "🚫 Не удалось извлечь ID автомобиля из ссылки KCar."
+        if not krw_rate or krw_rate <= 0:
+            bot.send_message(
+                message.chat.id,
+                "❌ Ошибка получения курса валют. Пожалуйста, попробуйте позже.",
+                parse_mode="HTML",
             )
             return
 
-    else:
-        # Извлекаем carid с URL encar
-        parsed_url = urlparse(link)
-        query_params = parse_qs(parsed_url.query)
-        car_id = query_params.get("carid", [None])[0]
-
-    # Если ссылка с encar
-    if "fem.encar.com" in link:
-        result = get_car_info(link)
-        (
-            car_price,
-            car_engine_displacement,
-            formatted_car_date,
-            car_title,
-            formatted_mileage,
-            formatted_transmission,
-            car_photos,
-            year,
-            month,
-            fuel_type,
-        ) = result
-
-        preview_link = f"https://fem.encar.com/cars/detail/{car_id}"
-
-    # Если ссылка с kbchacha
-    if "kbchachacha.com" in link:
-        result = get_car_info(link)
-
-        car_title = result["name"]
-
-        match = re.search(r"(\d{2})년(\d{2})월", result["year"])
-        if match:
-            car_year = match.group(1)
-            car_month = match.group(2)  # Получаем двухзначный месяц
-        else:
-            car_year = "Не найдено"
-            car_month = "Не найдено"
-
-        month = car_month
-        year = car_year
-
-        car_engine_displacement = re.sub(r"[^\d]", "", result["engine_volume"])
-        car_engine_displacement = (
-            2200 if result["fuel"] == "디젤" else car_engine_displacement
-        )
-
-        car_price = int(result["car_price"]) / 10000
-        formatted_car_date = f"01{car_month}{match.group(1)}"
-        formatted_mileage = result["mileage"]
-        formatted_transmission = (
-            "Автомат" if "오토" in result["transmission"] else "Механика"
-        )
-        car_photos = result["images"]
-
-        fuel_type = "가솔린"
-
-        preview_link = (
-            f"https://www.kbchachacha.com/public/car/detail.kbc?carSeq={car_id}"
-        )
-
-    if "kcar" in link:
-        result = get_car_info(link)
-
-        car_title = result["name"]
-
-        month = result["month"]
-        year = result["year"]
-
-        car_month = month
-        car_year = year[2:]
-
-        car_engine_displacement = re.sub(r"\D+", "", result["engine_volume"])
-        car_price = int(result["car_price"]) / 10000
-
-        car_photos = result["images"]
-
-        fuel_type = "가솔린"
-
-        # Форматируем дату
-        formatted_car_date = (
-            f"01{car_month}{car_year[-2:]}"
-            if car_year != "Не найдено"
-            else "Не найдено"
-        )
-
-        # Форматируем пробег
-        formatted_mileage = format_number(result["mileage"]) + " км"
-
-        # Определяем КПП
-        formatted_transmission = (
-            "Автомат" if "오토" in result["transmission"] else "Механика"
-        )
-
-        preview_link = f"https://www.kcar.com/bc/detail/carInfoDtl?i_sCarCd={car_id}"
-
-        own_car_insurance_payments = result["own_damage_total"]
-        other_car_insurance_payments = result["other_damage_total"]
-
-    if not car_price and car_engine_displacement and formatted_car_date:
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
-            )
-        )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
-            )
-        )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Рассчитать стоимость другого автомобиля",
-                callback_data="calculate_another",
-            )
-        )
-        bot.send_message(
-            message.chat.id, "Ошибка", parse_mode="Markdown", reply_markup=keyboard
-        )
-        bot.delete_message(message.chat.id, processing_message.message_id)
-        return
-
-    if car_price and car_engine_displacement and formatted_car_date:
-        car_engine_displacement = int(car_engine_displacement)
-
-        # Форматирование данных
-        formatted_car_year = f"20{car_year}"
-        engine_volume_formatted = f"{format_number(car_engine_displacement)} cc"
-
-        age = calculate_age(int(formatted_car_year), car_month)
-
-        age_formatted = (
-            "до 3 лет"
-            if age == "0-3"
-            else (
-                "от 3 до 5 лет"
-                if age == "3-5"
-                else "от 5 до 7 лет" if age == "5-7" else "от 7 лет"
-            )
-        )
-
-        # Конвертируем стоимость авто в рубли
-        # 1. Стоимость автомобиля
-        # 2. Комиссия Encar (440,000 вон)
-        # 3. Доставка до Владивостока (воны)
-        # 4. Таможенные платежи во Владивостоке
-        # 5. Услуги брокера
-
-        price_krw = int(car_price) * 10000
-        price_rub = price_krw / rub_to_krw_rate
-
-        response = get_customs_fees(
-            car_engine_displacement,
-            price_krw,
-            int(formatted_car_year),
-            car_month,
-            engine_type=(
-                1 if fuel_type == "가솔린" else 2 if fuel_type == "디젤" else 3
-            ),
-        )
-
-        # Таможенный сбор
-        customs_fee = clean_number(response["sbor"])
-        customs_duty = clean_number(response["tax"])
-        recycling_fee = clean_number(response["util"])
-
-        # Расчет итоговой стоимости автомобиля в рублях
-        total_cost = (
-            price_rub  # Стоимость автомобиля
-            + (440000 / rub_to_krw_rate)  # Комиссия Encar
-            + (1300000 / rub_to_krw_rate)  # Доставка до Владивостока
-            + customs_fee  # Таможенный сбор
-            + customs_duty  # Таможенная пошлина
-            + recycling_fee  # Утильсбор
-            + 100000  # Услуги брокера
-        )
-
-        total_cost_krw = (
-            price_krw  # Стоимость автомобиля
-            + 440000  # Комиссия Encar
-            + 1300000  # Доставка до Владивостока
-            + (customs_fee * rub_to_krw_rate)  # Таможенный сбор
-            + (customs_duty * rub_to_krw_rate)  # Таможенная пошлина
-            + (recycling_fee * rub_to_krw_rate)  # Утильсбор
-            + (100000 * rub_to_krw_rate)  # Услуги брокера
-        )
-
-        # Общая сумма под ключ до Владивостока
-        car_data["total_cost_krw"] = total_cost_krw
-        car_data["total_cost_rub"] = total_cost
-
-        # Стоимость автомобиля
-        car_data["car_price_krw"] = price_krw
-        car_data["car_price_rub"] = price_rub
-
-        # Комиссия Encar
-        car_data["encar_fee_krw"] = 440000
-        car_data["encar_fee_rub"] = 440000 / rub_to_krw_rate
-
-        # Доставка до Владивостока
-        car_data["delivery_fee_krw"] = 1300000
-        car_data["delivery_fee_rub"] = 1300000 / rub_to_krw_rate
-
-        # Расходы по РФ
-        car_data["customs_duty_rub"] = customs_duty
-        car_data["customs_duty_krw"] = customs_duty * rub_to_krw_rate
-
-        car_data["customs_fee_rub"] = customs_fee
-        car_data["customs_fee_krw"] = customs_fee * rub_to_krw_rate
-
-        car_data["util_fee_rub"] = recycling_fee
-        car_data["util_fee_krw"] = recycling_fee * rub_to_krw_rate
-
-        car_data["broker_fee_rub"] = 100000
-        car_data["broker_fee_krw"] = 100000 * rub_to_krw_rate
-
-        car_insurance_payments_chutcha = ""
-        if "kcar" in link:
-            own_insurance_text = (
-                f"₩{format_number(own_car_insurance_payments)}"
-                if isinstance(own_car_insurance_payments, int)
-                else "Нет"
-            )
-            other_insurance_text = (
-                f"₩{format_number(other_car_insurance_payments)}"
-                if isinstance(other_car_insurance_payments, int)
-                else "Нет"
-            )
-
-            car_insurance_payments_chutcha = (
-                f"▪️ Страховые выплаты по данному автомобилю:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>{own_insurance_text}</b>\n"
-                f"▪️ Страховые выплаты другому автомобилю:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>{other_insurance_text}</b>\n\n"
-            )
-
-        # Формирование сообщения результата
-        # f"💵 <b>Курс USDT к Воне: ₩{format_number(usdt_to_krw_rate)}</b>\n\n"
-        result_message = (
-            f"❯ <b>{car_title}</b>\n\n"
-            f"▪️ Возраст: <b>{age_formatted}</b> <i>(дата регистрации: {month}/{year})</i>\n"
-            f"▪️ Пробег: <b>{formatted_mileage}</b>\n"
-            f"▪️ Объём двигателя: <b>{engine_volume_formatted}</b>\n"
-            f"▪️ КПП: <b>{formatted_transmission}</b>\n\n"
-            f"💰 <b>Курс Рубля к Воне: ₩{rub_to_krw_rate:.2f}</b>\n\n"
-            # f"▪️ Стоимость автомобиля в Корее:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(price_krw)}</b>\n\n"
-            # f"▪️ Стоимость автомобиля под ключ до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(total_cost_krw)}</b> | <b>{format_number(total_cost)} ₽</b>\n\n"
-            f"1️⃣ Стоимость автомобиля:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['car_price_krw'])}</b> | <b>{format_number(car_data['car_price_rub'])} ₽</b>\n\n"
-            f"2️⃣ Комиссия Encar:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['encar_fee_krw'])}</b> | <b>{format_number(car_data['encar_fee_rub'])} ₽</b>\n\n"
-            f"3️⃣ Доставка до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['delivery_fee_krw'])}</b> | <b>{format_number(car_data['delivery_fee_rub'])} ₽</b>\n\n"
-            f"4️⃣ Единая таможенная ставка:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_duty_krw'])}</b> | <b>{format_number(car_data['customs_duty_rub'])} ₽</b>\n\n"
-            f"5️⃣ Таможенное оформление:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_fee_krw'])}</b> | <b>{format_number(car_data['customs_fee_rub'])} ₽</b>\n\n"
-            f"6️⃣ Утилизационный сбор:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['util_fee_krw'])}</b> | <b>{format_number(car_data['util_fee_rub'])} ₽</b>\n\n"
-            f"7️⃣ Услуги брокера:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['broker_fee_krw'])}</b> | <b>{format_number(car_data['broker_fee_rub'])} ₽</b>\n\n"
-            f"🟰 Итого под ключ: \n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['total_cost_krw'])}</b> | <b>{format_number(car_data['total_cost_rub'])} ₽</b>\n\n"
-            f"{car_insurance_payments_chutcha}"
-            f"🔗 <a href='{preview_link}'>Ссылка на автомобиль</a>\n\n"
-            "Если данное авто попадает под санкции, пожалуйста уточните возможность отправки в вашу страну у наших менеджеров:\n\n"
-            f"▪️ +82-10-2889-2307 (Олег)\n"
-            f"▪️ +82-10-5812-2515 (Дмитрий)\n\n"
-            "🔗 <a href='https://t.me/crvntrade'>Официальный телеграм канал</a>\n"
-        )
-
-        # Клавиатура с дальнейшими действиями
-        keyboard = types.InlineKeyboardMarkup()
-        # keyboard.add(
-        #     types.InlineKeyboardButton("Детали расчёта", callback_data="detail")
-        # )
-
-        # Кнопка для добавления в избранное
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "⭐ Добавить в избранное",
-                callback_data=f"add_favorite_{car_id_external}",
-            )
-        )
-
-        if "fem.encar.com" in link:
-            keyboard.add(
-                types.InlineKeyboardButton(
-                    "Технический Отчёт об Автомобиле", callback_data="technical_card"
-                )
-            )
-            keyboard.add(
-                types.InlineKeyboardButton(
-                    "Выплаты по ДТП",
-                    callback_data="technical_report",
-                )
-            )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
-            )
-        )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
-            )
-        )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Расчёт другого автомобиля",
-                callback_data="calculate_another",
-            )
-        )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Главное меню",
-                callback_data="main_menu",
-            )
-        )
-
-        # Отправляем до 10 фотографий
-        media_group = []
-        for photo_url in sorted(car_photos):
-            try:
-                response = requests.get(photo_url)
-                if response.status_code == 200:
-                    photo = BytesIO(response.content)  # Загружаем фото в память
-                    media_group.append(
-                        types.InputMediaPhoto(photo)
-                    )  # Добавляем в список
-
-                    # Если набрали 10 фото, отправляем альбом
-                    if len(media_group) == 10:
-                        bot.send_media_group(message.chat.id, media_group)
-                        media_group.clear()  # Очищаем список для следующей группы
-                else:
-                    print(f"Ошибка загрузки фото: {photo_url} - {response.status_code}")
-            except Exception as e:
-                print(f"Ошибка при обработке фото {photo_url}: {e}")
-
-        # Отправка оставшихся фото, если их меньше 10
-        if media_group:
-            bot.send_media_group(message.chat.id, media_group)
-
-        car_data["car_id"] = car_id
-        car_data["name"] = car_title
-        car_data["images"] = car_photos if isinstance(car_photos, list) else []
-        car_data["link"] = preview_link
-        car_data["year"] = year
-        car_data["month"] = month
-        car_data["mileage"] = formatted_mileage
-        car_data["engine_volume"] = car_engine_displacement
-        car_data["transmission"] = formatted_transmission
-        car_data["car_price"] = price_krw
-        car_data["user_name"] = message.from_user.username
-        car_data["first_name"] = message.from_user.first_name
-        car_data["last_name"] = message.from_user.last_name
+        rub_to_krw_rate = krw_rate  # Update global rate
 
         bot.send_message(
             message.chat.id,
-            result_message,
-            parse_mode="HTML",
-            reply_markup=keyboard,
+            "✅ Подгружаю актуальный курс валют и делаю расчёты. ⏳ Пожалуйста подождите...",
+            parse_mode="Markdown",
         )
 
-        bot.delete_message(
-            message.chat.id, processing_message.message_id
-        )  # Удаляем сообщение о передаче данных в обработку
+        print_message("ЗАПРОС НА РАСЧЁТ АВТОМОБИЛЯ")
 
-    else:
-        send_error_message(
-            message,
-            "🚫 Произошла ошибка при получении данных. Проверьте ссылку и попробуйте снова.",
+        # Отправляем сообщение и сохраняем его ID
+        processing_message = bot.send_message(
+            message.chat.id, "Обрабатываю данные... ⏳"
+        )
+
+        car_id = None
+        car_title = ""
+
+        if "fem.encar.com" in link:
+            car_id_match = re.findall(r"\d+", link)
+            if car_id_match:
+                car_id = car_id_match[0]  # Use the first match of digits
+                car_id_external = car_id
+                link = f"https://fem.encar.com/cars/detail/{car_id}"
+            else:
+                send_error_message(message, "🚫 Не удалось извлечь carid из ссылки.")
+                return
+
+        elif "kbchachacha.com" in link or "m.kbchachacha.com" in link:
+            parsed_url = urlparse(link)
+            query_params = parse_qs(parsed_url.query)
+            car_id = query_params.get("carSeq", [None])[0]
+
+            if car_id:
+                car_id_external = car_id
+                link = (
+                    f"https://www.kbchachacha.com/public/car/detail.kbc?carSeq={car_id}"
+                )
+            else:
+                send_error_message(message, "🚫 Не удалось извлечь carSeq из ссылки.")
+                return
+
+        elif "kcar.com" in link or "m.kcar.com" in link:
+            parsed_url = urlparse(link)
+            query_params = parse_qs(parsed_url.query)
+
+            if "i_sCarCd" in query_params:
+                car_id = query_params["i_sCarCd"][0]
+                car_id_external = car_id
+                link = f"https://api.kcar.com/bc/car-info-detail-of-ng?i_sCarCd={car_id}&i_sPassYn=N&bltbdKnd=CM050"
+            else:
+                send_error_message(
+                    message, "🚫 Не удалось извлечь ID автомобиля из ссылки KCar."
+                )
+                return
+
+        else:
+            # Извлекаем carid с URL encar
+            parsed_url = urlparse(link)
+            query_params = parse_qs(parsed_url.query)
+            car_id = query_params.get("carid", [None])[0]
+
+        # Если ссылка с encar
+        if "fem.encar.com" in link:
+            result = get_car_info(link)
+            (
+                car_price,
+                car_engine_displacement,
+                formatted_car_date,
+                car_title,
+                formatted_mileage,
+                formatted_transmission,
+                car_photos,
+                year,
+                month,
+                fuel_type,
+            ) = result
+
+            preview_link = f"https://fem.encar.com/cars/detail/{car_id}"
+
+        # Если ссылка с kbchacha
+        if "kbchachacha.com" in link:
+            result = get_car_info(link)
+
+            car_title = result["name"]
+
+            match = re.search(r"(\d{2})년(\d{2})월", result["year"])
+            if match:
+                car_year = match.group(1)
+                car_month = match.group(2)  # Получаем двухзначный месяц
+            else:
+                car_year = "Не найдено"
+                car_month = "Не найдено"
+
+            month = car_month
+            year = car_year
+
+            car_engine_displacement = re.sub(r"[^\d]", "", result["engine_volume"])
+            car_engine_displacement = (
+                2200 if result["fuel"] == "디젤" else car_engine_displacement
+            )
+
+            car_price = int(result["car_price"]) / 10000
+            formatted_car_date = f"01{car_month}{match.group(1)}"
+            formatted_mileage = result["mileage"]
+            formatted_transmission = (
+                "Автомат" if "오토" in result["transmission"] else "Механика"
+            )
+            car_photos = result["images"]
+
+            fuel_type = "가솔린"
+
+            preview_link = (
+                f"https://www.kbchachacha.com/public/car/detail.kbc?carSeq={car_id}"
+            )
+
+        if "kcar" in link:
+            result = get_car_info(link)
+
+            car_title = result["name"]
+
+            month = result["month"]
+            year = result["year"]
+
+            car_month = month
+            car_year = year[2:]
+
+            car_engine_displacement = re.sub(r"\D+", "", result["engine_volume"])
+            car_price = int(result["car_price"]) / 10000
+
+            car_photos = result["images"]
+
+            fuel_type = "가솔린"
+
+            # Форматируем дату
+            formatted_car_date = (
+                f"01{car_month}{car_year[-2:]}"
+                if car_year != "Не найдено"
+                else "Не найдено"
+            )
+
+            # Форматируем пробег
+            formatted_mileage = format_number(result["mileage"]) + " км"
+
+            # Определяем КПП
+            formatted_transmission = (
+                "Автомат" if "오토" in result["transmission"] else "Механика"
+            )
+
+            preview_link = (
+                f"https://www.kcar.com/bc/detail/carInfoDtl?i_sCarCd={car_id}"
+            )
+
+            own_car_insurance_payments = result["own_damage_total"]
+            other_car_insurance_payments = result["other_damage_total"]
+
+        if not car_price and car_engine_displacement and formatted_car_date:
+            keyboard = types.InlineKeyboardMarkup()
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+                )
+            )
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
+                )
+            )
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    "Рассчитать стоимость другого автомобиля",
+                    callback_data="calculate_another",
+                )
+            )
+            bot.send_message(
+                message.chat.id, "Ошибка", parse_mode="Markdown", reply_markup=keyboard
+            )
+            bot.delete_message(message.chat.id, processing_message.message_id)
+            return
+
+        if car_price and car_engine_displacement and formatted_car_date:
+            try:
+                car_engine_displacement = int(car_engine_displacement)
+
+                # Форматирование данных
+                formatted_car_year = f"20{car_year}"
+                engine_volume_formatted = f"{format_number(car_engine_displacement)} cc"
+
+                age = calculate_age(int(formatted_car_year), car_month)
+
+                age_formatted = (
+                    "до 3 лет"
+                    if age == "0-3"
+                    else (
+                        "от 3 до 5 лет"
+                        if age == "3-5"
+                        else "от 5 до 7 лет" if age == "5-7" else "от 7 лет"
+                    )
+                )
+
+                # Safety check for division
+                if rub_to_krw_rate <= 0:
+                    raise ValueError("Invalid currency rate")
+
+                # Конвертируем стоимость авто в рубли
+                price_krw = int(car_price) * 10000
+                price_rub = price_krw / rub_to_krw_rate
+
+                response = get_customs_fees(
+                    car_engine_displacement,
+                    price_krw,
+                    int(formatted_car_year),
+                    car_month,
+                    engine_type=(
+                        1 if fuel_type == "가솔린" else 2 if fuel_type == "디젤" else 3
+                    ),
+                )
+
+                # Таможенный сбор
+                customs_fee = clean_number(response["sbor"])
+                customs_duty = clean_number(response["tax"])
+                recycling_fee = clean_number(response["util"])
+
+                # Расчет итоговой стоимости автомобиля в рублях
+                total_cost = (
+                    price_rub  # Стоимость автомобиля
+                    + (440000 / rub_to_krw_rate)  # Комиссия Encar
+                    + (1300000 / rub_to_krw_rate)  # Доставка до Владивостока
+                    + customs_fee  # Таможенный сбор
+                    + customs_duty  # Таможенная пошлина
+                    + recycling_fee  # Утильсбор
+                    + 100000  # Услуги брокера
+                )
+
+                total_cost_krw = (
+                    price_krw  # Стоимость автомобиля
+                    + 440000  # Комиссия Encar
+                    + 1300000  # Доставка до Владивостока
+                    + (customs_fee * rub_to_krw_rate)  # Таможенный сбор
+                    + (customs_duty * rub_to_krw_rate)  # Таможенная пошлина
+                    + (recycling_fee * rub_to_krw_rate)  # Утильсбор
+                    + (100000 * rub_to_krw_rate)  # Услуги брокера
+                )
+
+                # Общая сумма под ключ до Владивостока
+                car_data["total_cost_krw"] = total_cost_krw
+                car_data["total_cost_rub"] = total_cost
+
+                # Стоимость автомобиля
+                car_data["car_price_krw"] = price_krw
+                car_data["car_price_rub"] = price_rub
+
+                # Комиссия Encar
+                car_data["encar_fee_krw"] = 440000
+                car_data["encar_fee_rub"] = 440000 / rub_to_krw_rate
+
+                # Доставка до Владивостока
+                car_data["delivery_fee_krw"] = 1300000
+                car_data["delivery_fee_rub"] = 1300000 / rub_to_krw_rate
+
+                # Расходы по РФ
+                car_data["customs_duty_rub"] = customs_duty
+                car_data["customs_duty_krw"] = customs_duty * rub_to_krw_rate
+
+                car_data["customs_fee_rub"] = customs_fee
+                car_data["customs_fee_krw"] = customs_fee * rub_to_krw_rate
+
+                car_data["util_fee_rub"] = recycling_fee
+                car_data["util_fee_krw"] = recycling_fee * rub_to_krw_rate
+
+                car_data["broker_fee_rub"] = 100000
+                car_data["broker_fee_krw"] = 100000 * rub_to_krw_rate
+
+                car_insurance_payments_chutcha = ""
+                if "kcar" in link:
+                    own_insurance_text = (
+                        f"₩{format_number(own_car_insurance_payments)}"
+                        if isinstance(own_car_insurance_payments, int)
+                        else "Нет"
+                    )
+                    other_insurance_text = (
+                        f"₩{format_number(other_car_insurance_payments)}"
+                        if isinstance(other_car_insurance_payments, int)
+                        else "Нет"
+                    )
+
+                    car_insurance_payments_chutcha = (
+                        f"▪️ Страховые выплаты по данному автомобилю:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>{own_insurance_text}</b>\n"
+                        f"▪️ Страховые выплаты другому автомобилю:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>{other_insurance_text}</b>\n\n"
+                    )
+
+                # Формирование сообщения результата
+                # f"💵 <b>Курс USDT к Воне: ₩{format_number(usdt_to_krw_rate)}</b>\n\n"
+                result_message = (
+                    f"❯ <b>{car_title}</b>\n\n"
+                    f"▪️ Возраст: <b>{age_formatted}</b> <i>(дата регистрации: {month}/{year})</i>\n"
+                    f"▪️ Пробег: <b>{formatted_mileage}</b>\n"
+                    f"▪️ Объём двигателя: <b>{engine_volume_formatted}</b>\n"
+                    f"▪️ КПП: <b>{formatted_transmission}</b>\n\n"
+                    f"💰 <b>Курс Рубля к Воне: ₩{rub_to_krw_rate:.2f}</b>\n\n"
+                    # f"▪️ Стоимость автомобиля в Корее:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(price_krw)}</b>\n\n"
+                    # f"▪️ Стоимость автомобиля под ключ до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(total_cost_krw)}</b> | <b>{format_number(total_cost)} ₽</b>\n\n"
+                    f"1️⃣ Стоимость автомобиля:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['car_price_krw'])}</b> | <b>{format_number(car_data['car_price_rub'])} ₽</b>\n\n"
+                    f"2️⃣ Комиссия Encar:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['encar_fee_krw'])}</b> | <b>{format_number(car_data['encar_fee_rub'])} ₽</b>\n\n"
+                    f"3️⃣ Доставка до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['delivery_fee_krw'])}</b> | <b>{format_number(car_data['delivery_fee_rub'])} ₽</b>\n\n"
+                    f"4️⃣ Единая таможенная ставка:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_duty_krw'])}</b> | <b>{format_number(car_data['customs_duty_rub'])} ₽</b>\n\n"
+                    f"5️⃣ Таможенное оформление:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_fee_krw'])}</b> | <b>{format_number(car_data['customs_fee_rub'])} ₽</b>\n\n"
+                    f"6️⃣ Утилизационный сбор:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['util_fee_krw'])}</b> | <b>{format_number(car_data['util_fee_rub'])} ₽</b>\n\n"
+                    f"7️⃣ Услуги брокера:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['broker_fee_krw'])}</b> | <b>{format_number(car_data['broker_fee_rub'])} ₽</b>\n\n"
+                    f"🟰 Итого под ключ: \n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['total_cost_krw'])}</b> | <b>{format_number(car_data['total_cost_rub'])} ₽</b>\n\n"
+                    f"{car_insurance_payments_chutcha}"
+                    f"🔗 <a href='{preview_link}'>Ссылка на автомобиль</a>\n\n"
+                    "Если данное авто попадает под санкции, пожалуйста уточните возможность отправки в вашу страну у наших менеджеров:\n\n"
+                    f"▪️ +82-10-2889-2307 (Олег)\n"
+                    f"▪️ +82-10-5812-2515 (Дмитрий)\n\n"
+                    "🔗 <a href='https://t.me/crvntrade'>Официальный телеграм канал</a>\n"
+                )
+
+                # Клавиатура с дальнейшими действиями
+                keyboard = types.InlineKeyboardMarkup()
+                # keyboard.add(
+                #     types.InlineKeyboardButton("Детали расчёта", callback_data="detail")
+                # )
+
+                # Кнопка для добавления в избранное
+                keyboard.add(
+                    types.InlineKeyboardButton(
+                        "⭐ Добавить в избранное",
+                        callback_data=f"add_favorite_{car_id_external}",
+                    )
+                )
+
+                if "fem.encar.com" in link:
+                    keyboard.add(
+                        types.InlineKeyboardButton(
+                            "Технический Отчёт об Автомобиле",
+                            callback_data="technical_card",
+                        )
+                    )
+                    keyboard.add(
+                        types.InlineKeyboardButton(
+                            "Выплаты по ДТП",
+                            callback_data="technical_report",
+                        )
+                    )
+                keyboard.add(
+                    types.InlineKeyboardButton(
+                        "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+                    )
+                )
+                keyboard.add(
+                    types.InlineKeyboardButton(
+                        "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
+                    )
+                )
+                keyboard.add(
+                    types.InlineKeyboardButton(
+                        "Расчёт другого автомобиля",
+                        callback_data="calculate_another",
+                    )
+                )
+                keyboard.add(
+                    types.InlineKeyboardButton(
+                        "Главное меню",
+                        callback_data="main_menu",
+                    )
+                )
+
+                # Отправляем до 10 фотографий
+                media_group = []
+                for photo_url in sorted(car_photos):
+                    try:
+                        response = requests.get(photo_url)
+                        if response.status_code == 200:
+                            photo = BytesIO(response.content)  # Загружаем фото в память
+                            media_group.append(
+                                types.InputMediaPhoto(photo)
+                            )  # Добавляем в список
+
+                            # Если набрали 10 фото, отправляем альбом
+                            if len(media_group) == 10:
+                                bot.send_media_group(message.chat.id, media_group)
+                                media_group.clear()  # Очищаем список для следующей группы
+                        else:
+                            print(
+                                f"Ошибка загрузки фото: {photo_url} - {response.status_code}"
+                            )
+                    except Exception as e:
+                        print(f"Ошибка при обработке фото {photo_url}: {e}")
+
+                # Отправка оставшихся фото, если их меньше 10
+                if media_group:
+                    bot.send_media_group(message.chat.id, media_group)
+
+                car_data["car_id"] = car_id
+                car_data["name"] = car_title
+                car_data["images"] = car_photos if isinstance(car_photos, list) else []
+                car_data["link"] = preview_link
+                car_data["year"] = year
+                car_data["month"] = month
+                car_data["mileage"] = formatted_mileage
+                car_data["engine_volume"] = car_engine_displacement
+                car_data["transmission"] = formatted_transmission
+                car_data["car_price"] = price_krw
+                car_data["user_name"] = message.from_user.username
+                car_data["first_name"] = message.from_user.first_name
+                car_data["last_name"] = message.from_user.last_name
+
+                bot.send_message(
+                    message.chat.id,
+                    result_message,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+
+                bot.delete_message(
+                    message.chat.id, processing_message.message_id
+                )  # Удаляем сообщение о передаче данных в обработку
+
+            except ValueError as e:
+                bot.send_message(
+                    message.chat.id,
+                    f"❌ Ошибка при расчёте стоимости: {e}",
+                    parse_mode="HTML",
+                )
+                bot.delete_message(message.chat.id, processing_message.message_id)
+
+        else:
+            send_error_message(
+                message,
+                "🚫 Произошла ошибка при получении данных. Проверьте ссылку и попробуйте снова.",
+            )
+            bot.delete_message(message.chat.id, processing_message.message_id)
+
+    except Exception as e:
+        bot.send_message(
+            message.chat.id, f"❌ Ошибка при получении данных: {e}", parse_mode="HTML"
         )
         bot.delete_message(message.chat.id, processing_message.message_id)
 
