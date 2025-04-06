@@ -901,8 +901,6 @@ def get_rub_to_krw_rate():
         response = requests.get(url, headers=headers)
         response.raise_for_status()
 
-        print(response.text)
-
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Ищем элемент p.no_today
