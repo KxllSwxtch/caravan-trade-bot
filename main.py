@@ -2364,6 +2364,9 @@ def process_car_price(message):
     car_data["util_fee_rub"] = recycling_fee
     car_data["util_fee_krw"] = recycling_fee * rub_to_krw_rate
 
+    car_data["broker_fee_rub"] = 100000
+    car_data["broker_fee_krw"] = 100000 * rub_to_krw_rate
+
     # Формируем сообщение с расчетом стоимости
     result_message = (
         f"💰 Курс Рубля к Воне: <b>₩{rub_to_krw_rate:.2f}</b>\n\n"
@@ -2373,6 +2376,7 @@ def process_car_price(message):
         f"4️⃣ Единая таможенная ставка:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_duty_krw'])}</b> | <b>{format_number(car_data['customs_duty_rub'])} ₽</b>\n\n"
         f"5️⃣ Таможенное оформление:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['customs_fee_krw'])}</b> | <b>{format_number(car_data['customs_fee_rub'])} ₽</b>\n\n"
         f"6️⃣ Утилизационный сбор:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['util_fee_krw'])}</b> | <b>{format_number(car_data['util_fee_rub'])} ₽</b>\n\n"
+        f"7️⃣ Брокерские услуги:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['broker_fee_krw'])}</b> | <b>{format_number(car_data['broker_fee_rub'])} ₽</b>\n\n"
         f"🟰 Итого под ключ: \n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['total_cost_krw'])}</b> | <b>{format_number(car_data['total_cost_rub'])} ₽</b>\n\n"
         f"🚚 <b>Доставку до вашего города уточняйте у менеджеров:</b>\n"
         f"▪️ +82-10-2889-2307 (Олег)\n"
