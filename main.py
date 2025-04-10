@@ -2181,9 +2181,18 @@ def handle_callback_query(call):
         )
 
     elif call.data == "calculate_another_manual":
+        # Запрашиваем возраст автомобиля
+        keyboard = types.ReplyKeyboardMarkup(
+            resize_keyboard=True, one_time_keyboard=True
+        )
+        keyboard.add("До 3 лет", "От 3 до 5 лет")
+        keyboard.add("От 5 до 7 лет", "Более 7 лет")
+        keyboard.add("Главное меню")
+
         msg = bot.send_message(
             call.message.chat.id,
-            "Выберите возраст автомобиля",
+            "Выберите возраст автомобиля:",
+            reply_markup=keyboard,
         )
         bot.register_next_step_handler(msg, process_car_age)
 
@@ -2245,6 +2254,48 @@ def process_engine_volume(message):
     # Сохраняем объем двигателя
     user_data[message.chat.id]["engine_volume"] = int(user_input)
 
+    # Запрашиваем тип топлива
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(types.KeyboardButton("Бензин"), types.KeyboardButton("Дизель"))
+    markup.add(types.KeyboardButton("Главное меню"))
+
+    bot.send_message(
+        message.chat.id,
+        "Выберите тип топлива:",
+        reply_markup=markup,
+    )
+    bot.register_next_step_handler(message, process_fuel_type)
+
+
+def process_fuel_type(message):
+    user_input = message.text.strip()
+
+    # Проверяем выбор типа топлива
+    if user_input == "Главное меню":
+        bot.send_message(message.chat.id, "Главное меню", reply_markup=main_menu())
+        return
+    elif user_input not in ["Бензин", "Дизель"]:
+        bot.send_message(message.chat.id, "Пожалуйста, выберите тип топлива из списка.")
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        markup.add(types.KeyboardButton("Бензин"), types.KeyboardButton("Дизель"))
+        markup.add(types.KeyboardButton("Главное меню"))
+        bot.send_message(
+            message.chat.id,
+            "Выберите тип топлива:",
+            reply_markup=markup,
+        )
+        bot.register_next_step_handler(message, process_fuel_type)
+        return
+
+    # Сопоставляем тип топлива с числовым значением
+    fuel_type_mapping = {
+        "Бензин": 1,
+        "Дизель": 2,
+    }
+
+    # Сохраняем тип топлива
+    user_data[message.chat.id]["fuel_type"] = fuel_type_mapping[user_input]
+
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(types.KeyboardButton("Главное меню"))
 
@@ -2293,17 +2344,21 @@ def process_car_price(message):
     age_group = user_data[message.chat.id]["car_age"]
     engine_volume = user_data[message.chat.id]["engine_volume"]
     car_price_krw = user_data[message.chat.id]["car_price_krw"]
+    engine_type = user_data[message.chat.id].get(
+        "fuel_type", 1
+    )  # По умолчанию бензин (1)
 
-    # Рассчитываем таможенные платежи
-    customs_fees = get_customs_fees_manual(engine_volume, car_price_krw, age_group)
-    customs_duty = clean_number(customs_fees["tax"])  # Таможенная пошлина
-    customs_fee = clean_number(customs_fees["sbor"])  # Таможенный сбор
-    recycling_fee = clean_number(customs_fees["util"])  # Утилизационный сбор
+    # Получаем название типа топлива для вывода
+    fuel_type_name = "Бензин" if engine_type == 1 else "Дизель"
 
-    # 1. Стоимость автомобиля
-    # 2. Комиссия Encar (440,000 вон)
-    # 3. Доставка до Владивостока (воны)
-    # 4. Таможенные платежи во Владивостоке
+    # Преобразуем возрастную группу в читаемый формат
+    age_display = {
+        "0-3": "До 3 лет",
+        "3-5": "От 3 до 5 лет",
+        "5-7": "От 5 до 7 лет",
+        "7-0": "Более 7 лет",
+    }.get(age_group, age_group)
+
     price_krw = car_price_krw
     price_rub = price_krw / rub_to_krw_rate
 
@@ -2311,7 +2366,7 @@ def process_car_price(message):
         engine_volume,
         price_krw,
         age_group,
-        engine_type=1,
+        engine_type=engine_type,
     )
 
     # Таможенный сбор
@@ -2327,6 +2382,7 @@ def process_car_price(message):
         + customs_fee  # Таможенный сбор
         + customs_duty  # Таможенная пошлина
         + recycling_fee  # Утильсбор
+        + 100000  # Услуги брокера
     )
 
     total_cost_krw = (
@@ -2336,6 +2392,7 @@ def process_car_price(message):
         + (customs_fee * rub_to_krw_rate)  # Таможенный сбор
         + (customs_duty * rub_to_krw_rate)  # Таможенная пошлина
         + (recycling_fee * rub_to_krw_rate)  # Утильсбор
+        + (100000 * rub_to_krw_rate)  # Услуги брокера
     )
 
     # Общая сумма под ключ до Владивостока
@@ -2370,6 +2427,10 @@ def process_car_price(message):
     # Формируем сообщение с расчетом стоимости
     result_message = (
         f"💰 Курс Рубля к Воне: <b>₩{rub_to_krw_rate:.2f}</b>\n\n"
+        f"🚗 Параметры автомобиля:\n"
+        f"▪️ Возраст: <b>{age_display}</b>\n"
+        f"▪️ Объем двигателя: <b>{engine_volume} см³</b>\n"
+        f"▪️ Тип топлива: <b>{fuel_type_name}</b>\n\n"
         f"1️⃣ Стоимость автомобиля:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['car_price_krw'])}</b> | <b>{format_number(car_data['car_price_rub'])} ₽</b>\n\n"
         f"2️⃣ Комиссия Encar:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['encar_fee_krw'])}</b> | <b>{format_number(car_data['encar_fee_rub'])} ₽</b>\n\n"
         f"3️⃣ Доставка до Владивостока:\n\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0<b>₩{format_number(car_data['delivery_fee_krw'])}</b> | <b>{format_number(car_data['delivery_fee_rub'])} ₽</b>\n\n"
@@ -2386,22 +2447,24 @@ def process_car_price(message):
 
     # Клавиатура с дальнейшими действиями
     keyboard = types.InlineKeyboardMarkup()
-    # keyboard.add(
-    #     types.InlineKeyboardButton(
-    #         "Рассчитать другой автомобиль", callback_data="calculate_another_manual"
-    #     )
-    # )
     keyboard.add(
         types.InlineKeyboardButton(
-            "Связаться с менеджером", url="https://t.me/KaMik_23"
+            "🔄 Рассчитать другой автомобиль", callback_data="calculate_another_manual"
         )
     )
     keyboard.add(
         types.InlineKeyboardButton(
-            "Связаться с менеджером", url="https://t.me/KaMik_23"
+            "👨‍💼 Связаться с менеджером (Олег)", url="https://t.me/KaMik_23"
         )
     )
-    keyboard.add(types.InlineKeyboardButton("Главное меню", callback_data="main_menu"))
+    keyboard.add(
+        types.InlineKeyboardButton(
+            "👨‍💼 Связаться с менеджером (Дима)", url="https://t.me/Pako_000"
+        )
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
+    )
 
     # Отправляем сообщение пользователю
     bot.send_message(
