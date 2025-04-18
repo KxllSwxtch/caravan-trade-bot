@@ -928,7 +928,7 @@ def get_rub_to_krw_rate():
             raise ValueError("Invalid rate value <= 0")
 
         # Вычитаем 0.8 и округляем до 2 знаков после запятой
-        rub_to_krw_rate = round(rate_value - 0.8, 2)
+        rub_to_krw_rate = round(rate_value - 1.2, 2)
 
         return rub_to_krw_rate
 
