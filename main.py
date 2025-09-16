@@ -895,44 +895,59 @@ def get_usdt_to_krw_rate():
 def get_rub_to_krw_rate():
     global rub_to_krw_rate
 
-    url = "https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_RUBKRW"
+    headers = {
+        'accept': 'application/json, text/javascript, */*; q=0.01',
+        'accept-language': 'en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5',
+        'origin': 'https://m.search.naver.com',
+        'priority': 'u=1, i',
+        'referer': 'https://m.search.naver.com/',
+        'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-site',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+    }
+
+    params = {
+        'key': 'calculator',
+        'pkid': '141',
+        'q': '환율',
+        'where': 'm',
+        'u1': 'keb',
+        'u6': 'standardUnit',
+        'u7': '0',
+        'u3': 'RUB',
+        'u4': 'KRW',
+        'u8': 'down',
+        'u2': '1',
+    }
+
     try:
-        headers = {"User-Agent": random.choice(user_agents)}
-        response = requests.get(url, headers=headers)
+        response = requests.get('https://ts-proxy.naver.com/content/qapirender.nhn',
+                               params=params, headers=headers)
         response.raise_for_status()
 
-        soup = BeautifulSoup(response.text, "html.parser")
+        data = response.json()
 
-        # Ищем элемент p.no_today
-        today_p = soup.select_one("p.no_today")
+        # Extract the KRW value from the response
+        if 'country' not in data or len(data['country']) < 2:
+            raise ValueError("Invalid response structure")
 
-        if not today_p:
-            raise ValueError("Element p.no_today not found")
+        krw_value_str = data['country'][1]['value']
+        rate_value = float(krw_value_str)
 
-        # Ищем вложенный элемент с курсом: em.no_up или em.no_down внутри em.no_up или em.no_down
-        rate_em = None
-        for class_name in ["no_up", "no_down"]:
-            outer_em = today_p.select_one(f"em.{class_name}")
-            if outer_em:
-                rate_em = outer_em.select_one(f"em.{class_name}")
-                if rate_em:
-                    break
-
-        if not rate_em:
-            raise ValueError("Rate element not found")
-
-        rate_text = rate_em.get_text().strip()
-        # Преобразуем текст в число, убирая возможные запятые
-        rate_value = float(rate_text.replace(",", "").strip())
         if rate_value <= 0:
             raise ValueError("Invalid rate value <= 0")
 
         # Вычитаем 0.8 и округляем до 2 знаков после запятой
         rub_to_krw_rate = round(rate_value - 0.8, 2)
 
+        print(f"RUB → KRW rate fetched: {rate_value} (adjusted: {rub_to_krw_rate})")
         return rub_to_krw_rate
 
-    except (requests.RequestException, ValueError) as e:
+    except (requests.RequestException, ValueError, KeyError) as e:
         print(f"Error getting RUB → KRW rate: {e}")
         # Return last known good rate if we have one, otherwise use a fallback rate
         if rub_to_krw_rate and rub_to_krw_rate > 0:
