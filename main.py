@@ -1553,6 +1553,14 @@ def calculate_cost(link, message):
                     ),
                 )
 
+                if response is None:
+                    bot.send_message(
+                        message.chat.id,
+                        "❌ Временная ошибка при расчете таможенных платежей. Сервис calcus.ru перегружен. Попробуйте через несколько минут.",
+                        reply_markup=types.ReplyKeyboardRemove()
+                    )
+                    return
+
                 # Таможенный сбор
                 customs_fee = clean_number(response["sbor"])
                 customs_duty = clean_number(response["tax"])
@@ -2383,6 +2391,14 @@ def process_car_price(message):
         age_group,
         engine_type=engine_type,
     )
+
+    if response is None:
+        bot.send_message(
+            message.chat.id,
+            "❌ Временная ошибка при расчете таможенных платежей. Сервис calcus.ru перегружен. Попробуйте через несколько минут.",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
+        return
 
     # Таможенный сбор
     customs_fee = clean_number(response["sbor"])

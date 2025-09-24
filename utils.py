@@ -84,7 +84,8 @@ def get_customs_fees_manual(engine_volume, car_price, car_age, engine_type=1):
     result = calcus_rate_limiter.execute_with_retry(make_request)
 
     if result is None:
-        print(f"Failed to get customs fees after all retries for engine_volume={engine_volume}, car_price={car_price}")
+        print(f"[CALCUS API ERROR] Failed to get customs fees after all retries for engine_volume={engine_volume}, car_price={car_price} (manual age={car_age})")
+        print(f"[CALCUS API ERROR] This usually indicates the calcus.ru API is rate limiting us or temporarily unavailable")
 
     return result
 
@@ -128,7 +129,9 @@ def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=
     result = calcus_rate_limiter.execute_with_retry(make_request)
 
     if result is None:
-        print(f"Failed to get customs fees after all retries for year={car_year}, month={car_month}, engine_volume={engine_volume}")
+        calculated_age = calculate_age(car_year, car_month)
+        print(f"[CALCUS API ERROR] Failed to get customs fees after all retries for year={car_year}, month={car_month}, engine_volume={engine_volume} (calculated age={calculated_age})")
+        print(f"[CALCUS API ERROR] This usually indicates the calcus.ru API is rate limiting us or temporarily unavailable")
 
     return result
 

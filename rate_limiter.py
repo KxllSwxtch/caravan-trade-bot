@@ -38,6 +38,8 @@ class RateLimiter:
         Block the current thread if rate limit would be exceeded.
         Ensures thread-safe access to the request queue.
         """
+        wait_time = 0
+
         with self.lock:
             current_time = time.time()
             self._cleanup_old_requests()
@@ -46,11 +48,8 @@ class RateLimiter:
                 # Calculate how long to wait until the oldest request expires
                 oldest_request = self.requests[0]
                 wait_time = self.time_window - (current_time - oldest_request)
-                if wait_time > 0:
-                    # Release lock during sleep to allow other threads to work
-                    pass
-            else:
-                wait_time = 0
+                # Ensure we wait at least a small amount to prevent tight loops
+                wait_time = max(wait_time, 0.1)
 
         # Sleep outside the lock if needed
         if wait_time > 0:
@@ -142,8 +141,8 @@ class RetryableRateLimiter:
 
 # Global rate limiter instance for calcus.ru API
 calcus_rate_limiter = RetryableRateLimiter(
-    max_requests=5,     # 5 requests
+    max_requests=2,     # 2 requests (more conservative)
     time_window=1.0,    # per second
-    max_retries=4,      # up to 4 retries
-    base_delay=1.0      # starting with 1 second delay
+    max_retries=3,      # up to 3 retries (less aggressive)
+    base_delay=2.0      # starting with 2 second delay (longer backoff)
 )
