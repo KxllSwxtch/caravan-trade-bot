@@ -3220,7 +3220,7 @@ def handle_message(message):
 
 # Run the bot
 if __name__ == "__main__":
-    # create_tables()
+    create_tables()
     # set_bot_commands()
 
     # Обновляем курс каждые 12 часов
