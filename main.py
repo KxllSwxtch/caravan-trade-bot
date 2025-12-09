@@ -2042,7 +2042,7 @@ def calculate_cost(link, message):
                 # Проверяем, есть ли сохранённый HP в базе данных
                 stored_hp = get_hp_from_specs(manufacturer, model, car_engine_displacement, fuel_type_ru)
 
-                if stored_hp is None and "fem.encar.com" in link:
+                if stored_hp is None:
                     # HP не найден - нужно запросить у пользователя
                     # Сохраняем данные о машине для продолжения расчёта после ввода HP
                     pending_hp_calculations[message.from_user.id] = {
@@ -2110,8 +2110,8 @@ def calculate_cost(link, message):
                     bot.delete_message(message.chat.id, processing_message.message_id)
                     return  # Ждём ввода HP от пользователя
 
-                # Используем HP из базы или 1 (для обратной совместимости с kbchacha/kcar)
-                power = stored_hp if stored_hp else 1
+                # Используем HP из базы (гарантированно есть, т.к. иначе запросили бы у пользователя)
+                power = stored_hp
 
                 response = get_customs_fees(
                     car_engine_displacement,
