@@ -74,6 +74,23 @@ def create_tables():
                 """
             )
 
+            # ✅ Таблица характеристик автомобилей (для хранения HP)
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS car_specs (
+                    id SERIAL PRIMARY KEY,
+                    manufacturer TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    engine_volume INT NOT NULL,
+                    fuel_type TEXT NOT NULL,
+                    hp INT NOT NULL,
+                    added_by BIGINT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(manufacturer, model, engine_volume, fuel_type)
+                );
+                """
+            )
+
             conn.commit()
 
 
@@ -318,3 +335,55 @@ def add_user(user_info):
                 ),
             )
             conn.commit()
+
+
+def get_hp_from_specs(manufacturer, model, engine_volume, fuel_type):
+    """
+    Получает HP из базы данных по характеристикам автомобиля.
+
+    :param manufacturer: Производитель (например, "Hyundai")
+    :param model: Модель (например, "Sonata")
+    :param engine_volume: Объём двигателя в куб. см (например, 2000)
+    :param fuel_type: Тип топлива (например, "Бензин")
+    :return: HP (int) или None если не найдено
+    """
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT hp FROM car_specs
+                WHERE manufacturer = %s AND model = %s AND engine_volume = %s AND fuel_type = %s;
+                """,
+                (manufacturer, model, engine_volume, fuel_type),
+            )
+            result = cur.fetchone()
+            return result["hp"] if result else None
+
+
+def save_hp_to_specs(manufacturer, model, engine_volume, fuel_type, hp, user_id):
+    """
+    Сохраняет HP в базу данных для характеристик автомобиля.
+    Если запись уже существует, обновляет HP.
+
+    :param manufacturer: Производитель (например, "Hyundai")
+    :param model: Модель (например, "Sonata")
+    :param engine_volume: Объём двигателя в куб. см (например, 2000)
+    :param fuel_type: Тип топлива (например, "Бензин")
+    :param hp: Мощность двигателя в л.с.
+    :param user_id: ID пользователя, который добавил запись
+    :return: True если успешно
+    """
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO car_specs (manufacturer, model, engine_volume, fuel_type, hp, added_by)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (manufacturer, model, engine_volume, fuel_type) DO UPDATE
+                SET hp = EXCLUDED.hp, added_by = EXCLUDED.added_by, created_at = CURRENT_TIMESTAMP;
+                """,
+                (manufacturer, model, engine_volume, fuel_type, hp, user_id),
+            )
+            conn.commit()
+    print(f"✅ HP {hp} сохранён для {manufacturer} {model} ({engine_volume}cc, {fuel_type})")
+    return True

@@ -3,7 +3,7 @@ import requests
 import datetime
 import locale
 import random
-from rate_limiter import calcus_rate_limiter
+from rate_limiter import calcus_rate_limiter, panauto_rate_limiter
 
 PROXY_URL = "http://B01vby:GBno0x@45.118.250.2:8000"
 proxies = {"http": PROXY_URL, "https": PROXY_URL}
@@ -46,13 +46,14 @@ def calculate_age(year, month):
         return "7-0"
 
 
-def get_customs_fees_manual(engine_volume, car_price, car_age, engine_type=1):
+def get_customs_fees_manual(engine_volume, car_price, car_age, engine_type=1, power=1):
     """
     Запрашивает расчёт таможенных платежей с сайта calcus.ru с rate limiting.
     :param engine_volume: Объём двигателя (куб. см)
     :param car_price: Цена авто в вонах
     :param car_age: Возрастная категория авто
     :param engine_type: Тип двигателя (1 - бензин, 2 - дизель, 3 - гибрид, 4 - электромобиль)
+    :param power: Мощность двигателя в л.с. (по умолчанию 1 для обратной совместимости)
     :return: JSON с результатами расчёта или None при ошибке
     """
     def make_request():
@@ -62,7 +63,7 @@ def get_customs_fees_manual(engine_volume, car_price, car_age, engine_type=1):
             "owner": 1,  # Физлицо
             "age": car_age,  # Возрастная категория
             "engine": engine_type,  # Тип двигателя (по умолчанию 1 - бензин)
-            "power": 1,  # Лошадиные силы (можно оставить 1)
+            "power": power,  # Лошадиные силы (реальное значение для расчёта утильсбора)
             "power_unit": 1,  # Тип мощности (1 - л.с.)
             "value": int(engine_volume),  # Объём двигателя
             "price": int(car_price),  # Цена авто в KRW
@@ -90,7 +91,7 @@ def get_customs_fees_manual(engine_volume, car_price, car_age, engine_type=1):
     return result
 
 
-def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=1):
+def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=1, power=1):
     """
     Запрашивает расчёт таможенных платежей с сайта calcus.ru с rate limiting.
     :param engine_volume: Объём двигателя (куб. см)
@@ -98,6 +99,7 @@ def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=
     :param car_year: Год выпуска авто
     :param car_month: Месяц выпуска авто
     :param engine_type: Тип двигателя (1 - бензин, 2 - дизель, 3 - гибрид, 4 - электромобиль)
+    :param power: Мощность двигателя в л.с. (по умолчанию 1 для обратной совместимости)
     :return: JSON с результатами расчёта или None при ошибке
     """
     def make_request():
@@ -107,7 +109,7 @@ def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=
             "owner": 1,  # Физлицо
             "age": calculate_age(car_year, car_month),  # Возрастная категория
             "engine": engine_type,  # Тип двигателя (по умолчанию 1 - бензин)
-            "power": 1,  # Лошадиные силы (можно оставить 1)
+            "power": power,  # Лошадиные силы (реальное значение для расчёта утильсбора)
             "power_unit": 1,  # Тип мощности (1 - л.с.)
             "value": int(engine_volume),  # Объём двигателя
             "price": int(car_price),  # Цена авто в KRW
@@ -139,6 +141,68 @@ def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=
 def clean_number(value):
     """Очищает строку от пробелов и преобразует в число"""
     return int(float(value.replace(" ", "").replace(",", ".")))
+
+
+def get_pan_auto_data(car_id):
+    """
+    Запрашивает данные об автомобиле с pan-auto.ru API.
+    Возвращает данные о машине включая HP и предрассчитанные таможенные платежи.
+
+    :param car_id: ID автомобиля на Encar (например, "40925064")
+    :return: dict с данными или None если машина не найдена
+    """
+    def make_request():
+        url = f"https://zefir.pan-auto.ru/api/cars/{car_id}/"
+
+        headers = {
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept": "*/*",
+            "Accept-Language": "en,ru;q=0.9",
+            "Origin": "https://pan-auto.ru",
+            "Referer": "https://pan-auto.ru/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+
+        # Return None for 404 (car not found)
+        if response.status_code == 404:
+            return None
+
+        response.raise_for_status()
+        return response.json()
+
+    try:
+        result = panauto_rate_limiter.execute_with_retry(make_request)
+
+        if result is None:
+            print(f"[PAN-AUTO] Car {car_id} not found on pan-auto.ru")
+            return None
+
+        # Extract relevant data from response
+        pan_auto_data = {
+            "id": result.get("id"),
+            "hp": result.get("hp"),
+            "displacement": result.get("displacement"),
+            "fuelType": result.get("fuelType"),
+            "manufacturer": result.get("manufacturer", {}).get("translation", ""),
+            "model": result.get("model", {}).get("translation", ""),
+            "mileage": result.get("mileage"),
+            "year": result.get("formYear"),
+            "costs": result.get("costs", {}).get("RUB", {}),
+            "carAge": result.get("carAge"),
+            "badge": result.get("badge"),
+            "badgeDetail": result.get("badgeDetail"),
+        }
+
+        print(f"[PAN-AUTO] Found car {car_id}: {pan_auto_data['manufacturer']} {pan_auto_data['model']}, HP: {pan_auto_data['hp']}")
+        return pan_auto_data
+
+    except Exception as e:
+        print(f"[PAN-AUTO ERROR] Failed to get data for car {car_id}: {e}")
+        return None
 
 
 def generate_encar_photo_url(photo_path):

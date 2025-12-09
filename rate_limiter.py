@@ -146,3 +146,11 @@ calcus_rate_limiter = RetryableRateLimiter(
     max_retries=3,      # up to 3 retries (less aggressive)
     base_delay=2.0      # starting with 2 second delay (longer backoff)
 )
+
+# Global rate limiter instance for pan-auto.ru API
+panauto_rate_limiter = RetryableRateLimiter(
+    max_requests=5,     # 5 requests per second
+    time_window=1.0,    # per second
+    max_retries=3,      # up to 3 retries
+    base_delay=1.0      # starting with 1 second delay
+)
