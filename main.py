@@ -1715,19 +1715,27 @@ def calculate_cost(link, message):
                     customs_duty = float(costs.get("customsDuty", 0))  # Таможенная пошлина
                     recycling_fee = float(costs.get("utilizationFee", 0))  # Утильсбор
 
-                    # Форматируем возраст
-                    car_age = pan_auto_data.get("carAge", 1)
+                    # Получаем точную дату регистрации из encar API (для правильного расчёта возраста)
+                    result = get_car_info(link)
+                    if result:
+                        car_photos = result[6] if len(result) > 6 else []
+                        year = result[7]  # 2-digit year from encar, e.g., "21"
+                        month = result[8]  # 2-digit month from encar, e.g., "12"
+                        year_full = f"20{year}"  # Full year, e.g., "2021"
+                    else:
+                        car_photos = []
+                        year_full = pan_auto_data.get("year", "2023")
+                        year = str(year_full)[-2:] if year_full else "23"
+                        month = "01"
+
+                    # Рассчитываем возраст по точной дате регистрации
+                    age = calculate_age(int(year_full), month)
                     age_formatted = (
-                        "до 3 лет" if car_age <= 1 else
-                        "от 3 до 5 лет" if car_age == 2 else
-                        "от 5 до 7 лет" if car_age == 3 else
+                        "до 3 лет" if age == "0-3" else
+                        "от 3 до 5 лет" if age == "3-5" else
+                        "от 5 до 7 лет" if age == "5-7" else
                         "от 7 лет"
                     )
-
-                    # Получаем год из pan-auto (формат "2023")
-                    year_full = pan_auto_data.get("year", "2023")
-                    year = str(year_full)[-2:] if year_full else "23"
-                    month = "01"  # pan-auto не даёт точный месяц
 
                     # Пробег
                     mileage_km = pan_auto_data.get("mileage", 0)
@@ -1735,13 +1743,6 @@ def calculate_cost(link, message):
 
                     # КПП (не указана в pan-auto, ставим по умолчанию)
                     formatted_transmission = "Автомат"
-
-                    # Фото (используем encar API для фото)
-                    result = get_car_info(link)
-                    if result:
-                        car_photos = result[6] if len(result) > 6 else []
-                    else:
-                        car_photos = []
 
                     preview_link = f"https://fem.encar.com/cars/detail/{car_id}"
 
