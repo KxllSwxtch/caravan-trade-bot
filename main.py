@@ -975,7 +975,7 @@ def complete_calculation_with_hp(user_id, hp, chat_id):
             callback_data="technical_report",
         ))
         keyboard.add(types.InlineKeyboardButton(
-            "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+            "Написать менеджеру (Олег)", url="https://t.me/Gelomik77"
         ))
         keyboard.add(types.InlineKeyboardButton(
             "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
@@ -1822,7 +1822,7 @@ def calculate_cost(link, message):
                         callback_data="technical_report",
                     ))
                     keyboard.add(types.InlineKeyboardButton(
-                        "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+                        "Написать менеджеру (Олег)", url="https://t.me/Gelomik77"
                     ))
                     keyboard.add(types.InlineKeyboardButton(
                         "Написать менеджеру (Дима)", url="https://t.me/Pako_000"
@@ -1980,7 +1980,7 @@ def calculate_cost(link, message):
             keyboard = types.InlineKeyboardMarkup()
             keyboard.add(
                 types.InlineKeyboardButton(
-                    "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+                    "Написать менеджеру (Олег)", url="https://t.me/Gelomik77"
                 )
             )
             keyboard.add(
@@ -2258,7 +2258,7 @@ def calculate_cost(link, message):
                     )
                 keyboard.add(
                     types.InlineKeyboardButton(
-                        "Написать менеджеру (Олег)", url="https://t.me/KaMik_23"
+                        "Написать менеджеру (Олег)", url="https://t.me/Gelomik77"
                     )
                 )
                 keyboard.add(
@@ -2703,12 +2703,12 @@ def handle_callback_query(call):
             )
             keyboard.add(
                 types.InlineKeyboardButton(
-                    "Связаться с менеджером", url="https://t.me/KaMik_23"
+                    "Связаться с менеджером", url="https://t.me/Gelomik77"
                 )
             )
             keyboard.add(
                 types.InlineKeyboardButton(
-                    "Связаться с менеджером", url="https://t.me/KaMik_23"
+                    "Связаться с менеджером", url="https://t.me/Gelomik77"
                 )
             )
 
@@ -2744,12 +2744,12 @@ def handle_callback_query(call):
             )
             keyboard.add(
                 types.InlineKeyboardButton(
-                    "Связаться с менеджером", url="https://t.me/KaMik_23"
+                    "Связаться с менеджером", url="https://t.me/Gelomik77"
                 )
             )
             keyboard.add(
                 types.InlineKeyboardButton(
-                    "Связаться с менеджером", url="https://t.me/KaMik_23"
+                    "Связаться с менеджером", url="https://t.me/Gelomik77"
                 )
             )
             keyboard.add(
@@ -3049,7 +3049,7 @@ def process_car_price(message):
     )
     keyboard.add(
         types.InlineKeyboardButton(
-            "👨‍💼 Связаться с менеджером (Олег)", url="https://t.me/KaMik_23"
+            "👨‍💼 Связаться с менеджером (Олег)", url="https://t.me/Gelomik77"
         )
     )
     keyboard.add(
