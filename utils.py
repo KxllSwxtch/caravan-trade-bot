@@ -1,8 +1,10 @@
-import time
-import requests
 import datetime
 import locale
 import random
+import time
+
+import requests
+
 from rate_limiter import calcus_rate_limiter, panauto_rate_limiter
 
 PROXY_URL = "http://B01vby:GBno0x@45.118.250.2:8000"
@@ -56,6 +58,7 @@ def get_customs_fees_manual(engine_volume, car_price, car_age, engine_type=1, po
     :param power: Мощность двигателя в л.с. (по умолчанию 1 для обратной совместимости)
     :return: JSON с результатами расчёта или None при ошибке
     """
+
     def make_request():
         url = "https://calcus.ru/calculate/Customs"
 
@@ -85,13 +88,19 @@ def get_customs_fees_manual(engine_volume, car_price, car_age, engine_type=1, po
     result = calcus_rate_limiter.execute_with_retry(make_request)
 
     if result is None:
-        print(f"[CALCUS API ERROR] Failed to get customs fees after all retries for engine_volume={engine_volume}, car_price={car_price} (manual age={car_age})")
-        print(f"[CALCUS API ERROR] This usually indicates the calcus.ru API is rate limiting us or temporarily unavailable")
+        print(
+            f"[CALCUS API ERROR] Failed to get customs fees after all retries for engine_volume={engine_volume}, car_price={car_price} (manual age={car_age})"
+        )
+        print(
+            f"[CALCUS API ERROR] This usually indicates the calcus.ru API is rate limiting us or temporarily unavailable"
+        )
 
     return result
 
 
-def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=1, power=1):
+def get_customs_fees(
+    engine_volume, car_price, car_year, car_month, engine_type=1, power=1
+):
     """
     Запрашивает расчёт таможенных платежей с сайта calcus.ru с rate limiting.
     :param engine_volume: Объём двигателя (куб. см)
@@ -102,6 +111,7 @@ def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=
     :param power: Мощность двигателя в л.с. (по умолчанию 1 для обратной совместимости)
     :return: JSON с результатами расчёта или None при ошибке
     """
+
     def make_request():
         url = "https://calcus.ru/calculate/Customs"
 
@@ -132,8 +142,12 @@ def get_customs_fees(engine_volume, car_price, car_year, car_month, engine_type=
 
     if result is None:
         calculated_age = calculate_age(car_year, car_month)
-        print(f"[CALCUS API ERROR] Failed to get customs fees after all retries for year={car_year}, month={car_month}, engine_volume={engine_volume} (calculated age={calculated_age})")
-        print(f"[CALCUS API ERROR] This usually indicates the calcus.ru API is rate limiting us or temporarily unavailable")
+        print(
+            f"[CALCUS API ERROR] Failed to get customs fees after all retries for year={car_year}, month={car_month}, engine_volume={engine_volume} (calculated age={calculated_age})"
+        )
+        print(
+            f"[CALCUS API ERROR] This usually indicates the calcus.ru API is rate limiting us or temporarily unavailable"
+        )
 
     return result
 
@@ -151,8 +165,9 @@ def get_pan_auto_data(car_id):
     :param car_id: ID автомобиля на Encar (например, "40925064")
     :return: dict с данными или None если машина не найдена
     """
+
     def make_request():
-        url = f"https://zefir.pan-auto.ru/api/cars/{car_id}/"
+        url = f"https://zefir.pan-auto.ru/api/korea/{car_id}/"
 
         headers = {
             "User-Agent": random.choice(USER_AGENTS),
@@ -197,7 +212,9 @@ def get_pan_auto_data(car_id):
             "badgeDetail": result.get("badgeDetail"),
         }
 
-        print(f"[PAN-AUTO] Found car {car_id}: {pan_auto_data['manufacturer']} {pan_auto_data['model']}, HP: {pan_auto_data['hp']}")
+        print(
+            f"[PAN-AUTO] Found car {car_id}: {pan_auto_data['manufacturer']} {pan_auto_data['model']}, HP: {pan_auto_data['hp']}"
+        )
         return pan_auto_data
 
     except Exception as e:
